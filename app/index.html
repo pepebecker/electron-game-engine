@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Game</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+	<div class="titlebar">Electron Game Engine</div>
+
+	<div id="editor">
+		<div id="editor-toolbar">
+			<select id="method-selection">
+				<option value="touch">Touch</option>
+				<option value="action">Action</option>
+				<option value="parallel">Parallel</option>
+			</select>
+			<div id="toolbar-buttons">
+				<div id="editor-save" class="editor-btn">Save</div>
+				<div id="editor-close" class="editor-btn">Cancel</div>
+				<div id="editor-remove" class="editor-btn">Delete</div>
+			</div>
+		</div>
+		<pre id="script-editor"></pre>
+	</div>
+
+	<script src="../node_modules/ace-editor-builds/src-min/ace.js" type="text/javascript" charset="utf-8"></script>
+	<script src="script.js"></script>
+</body>
+</html>

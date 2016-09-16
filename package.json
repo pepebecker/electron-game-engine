@@ -1,0 +1,18 @@
+{
+  "name": "game-engine",
+  "version": "1.0.0",
+  "description": "A game written in JavaScript",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Pepe Becker <mail@pepebecker.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron-builder": "^6.6.1"
+  },
+  "dependencies": {
+    "ace-editor-builds": "^1.2.4",
+    "pixi.js": "^4.0.1"
+  }
+}
