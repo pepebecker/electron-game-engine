@@ -9,6 +9,7 @@ const DebugInfo = require('debug-info')
 const Input = require('input')
 const Editor = require('editor')
 const Resources = require('resources')
+const Script = require('script')
 
 require('electron').webFrame.setZoomLevelLimits(1, 1)
 
@@ -23,7 +24,7 @@ const canvas = document.querySelector('canvas')
 
 let gameLayers = [new PIXI.Container(), new PIXI.Container(), new PIXI.Container()]
 let playerLayer = new PIXI.Container()
-let eventLayer = new PIXI.Container()
+let scriptLayer = new PIXI.Container()
 let debugLayer = new PIXI.Container()
 let editorLayer = new PIXI.Container()
 
@@ -32,6 +33,11 @@ let player = undefined
 
 let currentTypeIndex = 0
 let types = []
+
+let dragging = {
+	object: undefined,
+	copy: false
+}
 
 Resources.load(__dirname + '/resources/', setup)
 
@@ -46,15 +52,15 @@ function setup () {
 	playerLayer.position.x = gameOffset.x
 	playerLayer.position.y = gameOffset.y
 
-	eventLayer.position.x = gameOffset.x
-	eventLayer.position.y = gameOffset.y
+	scriptLayer.position.x = gameOffset.x
+	scriptLayer.position.y = gameOffset.y
 
 
 	Editor.init('editor', 'method-selection', 'script-editor', 'editor-save', 'editor-close', 'editor-remove')
 
 	world = new World(gameLayers, 20, 15)
 
-	setupEventLayer(world.width, world.height, world.tileSize)
+	setupScriptLayer(world.width, world.height, world.tileSize)
 
 	player = new Player(5, 3, world)
 
@@ -72,6 +78,9 @@ function setup () {
 	types = Resources.getSpriteNames('atlas')
 	DebugInfo.tile = types[0]
 
+	let script = new Script(0, 0, 'action', 'console.log("Pepe is awesome")')
+	script.run()
+
 	animate()
 }
 
@@ -85,11 +94,11 @@ function animate (time) {
 
 	let stage = new PIXI.Container()
 	playerLayer.addChild(player.sprite)
-	stage.addChild(gameLayers[0], gameLayers[1], playerLayer, gameLayers[2], eventLayer, debugLayer, editorLayer)
+	stage.addChild(gameLayers[0], gameLayers[1], playerLayer, gameLayers[2], scriptLayer, debugLayer, editorLayer)
 	renderer.render(stage)
 }
 
-function setupEventLayer(width, height, step) {
+function setupScriptLayer(width, height, step) {
 	for (let x = 0; x < width * step; x += step) {
 		let line = new PIXI.Graphics().lineStyle(1, 0xFFFFFF)
 		
@@ -101,13 +110,13 @@ function setupEventLayer(width, height, step) {
 
 		line.moveTo(x1, y1)
 		line.lineTo(x2, y2)
-		eventLayer.addChild(line)
+		scriptLayer.addChild(line)
 	}
 
 	let line = new PIXI.Graphics().lineStyle(1, 0xFFFFFF)
 	line.moveTo(width * step, 0)
 	line.lineTo(width * step, height * step)
-	eventLayer.addChild(line)
+	scriptLayer.addChild(line)
 
 	for (let y = 0; y < height * step; y += step) {
 		let line = new PIXI.Graphics().lineStyle(1, 0xFFFFFF)
@@ -120,20 +129,20 @@ function setupEventLayer(width, height, step) {
 
 		line.moveTo(x1, y1)
 		line.lineTo(x2, y2)
-		eventLayer.addChild(line)
+		scriptLayer.addChild(line)
 	}
 
 	let line2 = new PIXI.Graphics().lineStyle(1, 0xFFFFFF)
 	line2.moveTo(0, height * step)
 	line2.lineTo(width * step, height * step)
-	eventLayer.addChild(line2)
+	scriptLayer.addChild(line2)
 }
 
 function updateLayers() {
 	if (DebugInfo.mode === 'edit') {
-		eventLayer.visible = true
+		scriptLayer.visible = true
 	} else {
-		eventLayer.visible = false
+		scriptLayer.visible = false
 	}
 
 	for (let i = 0; i < gameLayers.length; i++) {
@@ -220,9 +229,11 @@ function handleInput (time) {
 	if (Input.isKeyDown('KeyD') && !Input.isKeyPressed('AltLeft')) player.setDirection('right')
 
 	if (Input.isKeyDown('Space')) {
-		let tile = player.getFacingTile()
-		if (tile && tile.options && tile.options.method === 'action') {
-			tile.options.execute()
+		let x = player.getFacingPosition().x
+		let y = player.getFacingPosition().y
+		let script = world.getScript(x, y)
+		if (script && script.method === 'action') {
+			script.run()
 		}
 	}
 
@@ -262,31 +273,27 @@ canvas.ondblclick = function (event) {
 	mouseY = Math.floor((mouseY - gameOffset.y) / world.tileSize)
 
 	if (DebugInfo.mode === 'edit') {
-		let tile = world.getTile(mouseX, mouseY)
-		if (tile) {
-			let newScript = false
-			if (!(tile.options && tile.options.script != undefined)) {
-				tile.options.method = 'touch'
-				tile.options.script = ''
-				newScript = true
-
-			}
-			Editor.open(tile.options.method, tile.options.script, function (state, method, script) {
-				if (state === 'save') {
-					tile.options.method = method
-					tile.options.script = script
-					tile.options.execute = new Function(script)
-				}
-
-				if ((state === 'cancel' && script.length === 0 && newScript) || state === 'remove') {
-					tile.options.method = undefined
-					tile.options.script = undefined
-					tile.options.execute = undefined
-				}
-
-				updateLayers()
-			})
+		let newScript = false
+		let script = world.getScript(mouseX, mouseY)
+		if (!script) {
+			script = world.createScript(mouseX, mouseY, 'touch', '')
+			script.addToStage(scriptLayer)
+			newScript = true
 		}
+
+		Editor.open(script.method, script.body, function (state, method, body) {
+			if (state === 'save') {
+				script.method = method
+				script.body = body
+				script.compile()
+			}
+
+			if ((state === 'cancel' && script.body.length === 0 && newScript) || state === 'remove') {
+				world.removeScript(mouseX, mouseY)
+			}
+
+			updateLayers()
+		})
 	}
 }
 
