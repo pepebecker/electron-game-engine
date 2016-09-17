@@ -15,6 +15,7 @@
   "dependencies": {
     "ace-editor-builds": "^1.2.4",
     "csjs-inject": "^1.0.0",
+    "electron": "^1.4.0",
     "pixi.js": "^4.0.1",
     "queue": "^4.0.0"
   }
