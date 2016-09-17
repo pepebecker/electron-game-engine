@@ -10,13 +10,14 @@ const Input = require('input')
 const Editor = require('editor')
 const Resources = require('resources')
 const Script = require('script')
+const alertView = require('alert-view')
 
 require('electron').webFrame.setZoomLevelLimits(1, 1)
 
 let titlebarHeight = 22
 let windowWidth = window.innerWidth
 let windowHeight = window.innerHeight - titlebarHeight
-let gameOffset = {x: 256, y: 0}
+let gameOffset = {x: 0, y: 0}
 
 const renderer = PIXI.autoDetectRenderer(windowWidth, windowHeight)
 document.body.appendChild(renderer.view)
@@ -43,6 +44,8 @@ Resources.load(__dirname + '/resources/', setup)
 
 function setup () {
 	DebugInfo.init(debugLayer, windowWidth, windowHeight)
+
+	alertView.init()
 
 	for (var i = 0; i < gameLayers.length; i++) {
 		gameLayers[i].position.x = gameOffset.x
@@ -75,11 +78,10 @@ function setup () {
 		updateLayers()
 	})
 
-	types = Resources.getSpriteNames('atlas')
-	DebugInfo.tile = types[0]
-
-	let script = new Script(0, 0, 'action', 'console.log("Pepe is awesome")')
-	script.run()
+	types = Resources.getSpriteNames('atlas.json')
+	if (types) {
+		DebugInfo.tile = types[0]
+	}
 
 	animate()
 }
@@ -101,7 +103,7 @@ function animate (time) {
 function setupScriptLayer(width, height, step) {
 	for (let x = 0; x < width * step; x += step) {
 		let line = new PIXI.Graphics().lineStyle(1, 0xFFFFFF)
-		
+
 		let x1 = x
 		let y1 = 0
 
@@ -153,23 +155,26 @@ function updateLayers() {
 			gameLayers[i].alpha = 1
 		}
 	}
-
-	// for (let i = 0; i < world.tiles.length; i++) {
-	// 	let tile = world.tiles[i]
-	// 	if (DebugInfo.mode === 'edit') {
-	// 		if (tile.options && tile.options.method) {
-	// 			tile.sprite.tint = '0xFF0000'
-	// 		} else {
-	// 			tile.sprite.tint = '0xFFFFFF'
-	// 		}
-	// 	} else {
-	// 		tile.sprite.tint = '0xFFFFFF'
-	// 	}
-	// }
 }
 
 function handleInput (time) {
-	if (Editor.isOpem) return
+	if (Editor.isOpen()) return
+
+	if (Input.isKeyDown('Space')) {
+		if (alertView.isOpen()) {
+			alertView.close()
+		} else {
+			let x = player.getFacingPosition().x
+			let y = player.getFacingPosition().y
+			let script = world.getScript(x, y)
+			if (script && script.method === 'action') {
+				script.setSandbox({player, world, alertView})
+				script.run()
+			}
+		}
+	}
+
+	if (alertView.isOpen()) return
 
 	if (Input.isKeyDown('KeyE') && Input.isKeyPressed('AltLeft')) {
 		if (DebugInfo.mode === 'play') {
@@ -218,24 +223,15 @@ function handleInput (time) {
 		}
 	}
 
-	if (Input.isKeyPressed('ArrowDown'	)) player.move( 0,  1)
-	if (Input.isKeyPressed('ArrowUp'	)) player.move( 0, -1)
-	if (Input.isKeyPressed('ArrowLeft'	)) player.move(-1,  0)
-	if (Input.isKeyPressed('ArrowRight'	)) player.move( 1,  0)
+	if (Input.isKeyPressed('ArrowDown'	)) player.move({ x:  0, y:  1, queue: false})
+	if (Input.isKeyPressed('ArrowUp'		)) player.move({ x:  0, y: -1, queue: false})
+	if (Input.isKeyPressed('ArrowLeft'	)) player.move({ x: -1, y:  0, queue: false})
+	if (Input.isKeyPressed('ArrowRight'	)) player.move({ x:  1, y:  0, queue: false})
 
 	if (Input.isKeyDown('KeyW') && !Input.isKeyPressed('AltLeft')) player.setDirection('up')
 	if (Input.isKeyDown('KeyS') && !Input.isKeyPressed('AltLeft')) player.setDirection('down')
 	if (Input.isKeyDown('KeyA') && !Input.isKeyPressed('AltLeft')) player.setDirection('left')
 	if (Input.isKeyDown('KeyD') && !Input.isKeyPressed('AltLeft')) player.setDirection('right')
-
-	if (Input.isKeyDown('Space')) {
-		let x = player.getFacingPosition().x
-		let y = player.getFacingPosition().y
-		let script = world.getScript(x, y)
-		if (script && script.method === 'action') {
-			script.run()
-		}
-	}
 
 	if (Input.isKeyDown('KeyR') && Input.isKeyPressed('AltLeft')) {
 		world.load('map', function (options) {
@@ -283,9 +279,8 @@ canvas.ondblclick = function (event) {
 
 		Editor.open(script.method, script.body, function (state, method, body) {
 			if (state === 'save') {
-				script.method = method
-				script.body = body
-				script.compile()
+				world.updateScript(script, method, body)
+				updateLayers()
 			}
 
 			if ((state === 'cancel' && script.body.length === 0 && newScript) || state === 'remove') {
