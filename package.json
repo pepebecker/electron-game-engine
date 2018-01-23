@@ -10,7 +10,7 @@
   "author": "Pepe Becker <mail@pepebecker.com>",
   "license": "MIT",
   "devDependencies": {
-    "electron-builder": "^6.6.1"
+    "electron-builder": "^19.55.2"
   },
   "dependencies": {
     "ace-editor-builds": "^1.2.4",
